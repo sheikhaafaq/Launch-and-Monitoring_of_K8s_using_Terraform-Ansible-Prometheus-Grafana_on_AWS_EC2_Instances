@@ -1,0 +1,98 @@
+---
+# tasks file for Masternode
+#
+#
+- name: installing docker
+  package:
+      name: docker
+      state: present
+
+- name: starting docker service
+  service: 
+      name: docker 
+      state: started
+      
+- name: enabling docker
+  service: 
+      name: docker
+      enabled: yes  
+
+- name: configuring yum repo for k8s
+  yum_repository:
+      name: kubernetes
+      description: kubernetes repo
+      baseurl: "https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64"
+      enabled: true
+      gpgcheck: true
+      repo_gpgcheck: true
+      gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg 
+        https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+  register: kubernetes_status
+
+- name: installing kubeadm
+  shell: "yum install -y kubeadm"
+  changed_when: false
+
+- name: enabling kublet
+  shell: "systemctl enable kubelet --now "
+  changed_when: false
+
+- name: pulling kubeadm config image 
+  shell: "kubeadm config images pull" 
+
+- name: Creating daemon.json file inside /etc/docker
+  template:
+          dest: "/etc/docker/daemon.json"
+          src: "daemon.json" 
+
+- name: Re-starting Docker
+  service:
+      name: docker
+      state:  restarted
+      enabled: yes
+
+- name: installing iproute-tc
+  package: 
+      name: iproute-tc
+        
+- name: Update config file for k8s
+  copy:
+    dest: /etc/sysctl.d/k8s.conf
+    content: |
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.bridge.bridge-nf-call-iptables = 1
+
+- name: Restarting systctl
+  shell: "sysctl --system"
+
+- name: starting kubeadm service
+  shell: "kubeadm init --pod-network-cidr=10.244.0.0/16 --ignore-preflight-errors=NumCPU --ignore-preflight-errors=Mem"
+  ignore_errors: yes
+
+- name: "Creating the directory"
+  file:
+      name: "$HOME/.kube"
+      state: directory  
+
+- name: "copying config file"
+  shell: "sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config"
+
+- shell: "chown $(id -u):$(id -g) $HOME/.kube/config"
+
+#- name: "Setup cni flannel plugin"
+#  shell: "sudo kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml" 
+
+- name: "Setup cni weave plugin"
+  shell: "sudo kubectl apply -f https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+
+- name: "Getting the join command"
+  shell: "kubeadm token  create --print-join-command"
+  register: token
+
+- debug:
+    var: token['stdout']
+
+- add_host:
+    name: "linkforjoining"
+    link: "{{ token['stdout'] }}"
+

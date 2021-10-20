@@ -1,0 +1,75 @@
+---
+# tasks file for Workernode
+
+
+- name: installing Docker
+  package:
+    name: docker
+    state: present
+
+- name: Starting Docker Service
+  service:
+    name: docker
+    state: started
+    
+- name: Enabling docker 
+  service: 
+    name: docker
+    enabled: yes  
+
+- name: configuring yum for k8s
+  yum_repository:
+    name: kubernetes
+    description: Kubernetes repo
+    baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
+    enabled: true
+    gpgcheck: true
+    repo_gpgcheck: true
+    gpgkey: >-
+      https://packages.cloud.google.com/yum/doc/yum-key.gpg 
+      https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+    exclude: kublet kubeadm kubectl
+
+- name: installing kubeadm, kubelet, kubectl
+  shell: "yum install -y kubelet kubeadm kubectl  --disableexcludes=kubernetes "
+  changed_when: false
+
+- name: enabling kublet
+  shell: "systemctl enable kubelet --now "
+  changed_when: false
+
+- name: pulling kubeadm config image
+  shell: "kubeadm config images pull"
+  
+- name: Creating daemon.json file inside /etc/docker
+  template:
+          dest: "/etc/docker/daemon.json"
+          src: "daemon.json"
+- name: Re-starting Docker
+  service:
+      name: docker
+      state:  restarted
+      enabled: yes
+
+- name: installing iproute-tc
+  package:
+      name: iproute-tc
+
+- name: Update config file for k8s
+  copy:
+    dest: /etc/sysctl.d/k8s.conf
+    content: |
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.bridge.bridge-nf-call-iptables = 1
+
+- name: Restarting sysctl
+  shell: "sysctl --system"
+
+
+- name: Join node to Kubernetes master
+  shell: "{{ hostvars['linkforjoining']['link'] }}"
+  register: status
+
+- debug:
+        var: status
+

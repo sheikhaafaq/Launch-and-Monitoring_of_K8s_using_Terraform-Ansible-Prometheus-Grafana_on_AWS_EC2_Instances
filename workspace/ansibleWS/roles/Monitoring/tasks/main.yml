@@ -1,0 +1,41 @@
+---
+# tasks file for Prometheus
+
+- name: update all packages
+  shell: "sudo yum update -y"
+
+- name: installing git
+  yum:
+       name: git
+       state: present
+
+- name: Clone Prometheus repo
+  git:
+      repo: https://github.com/sheikhaafaq/prometheus_on_kubernetes.git
+      dest: /prometheus_on_kubernetes
+      clone: yes
+      update: yes
+
+- name: Clone Grafana repo
+  git:
+      repo: https://github.com/sheikhaafaq/grafana_on_kubernetes.git
+      dest: /grafana_on_kubernetes
+      clone: yes
+      update: yes
+
+- name: Clone kube-state-metrics Deploymeny repo
+  git:
+      repo: https://github.com/sheikhaafaq/kube-state-metrics-configs.git
+      dest: /kube-state-metrics-configs/
+      clone: yes
+      update: yes
+
+- name: "Launch Prometheus Deployment"      
+  shell: "sudo kubectl apply -k /prometheus_on_kubernetes"
+
+- name: "Launch Grafana Deployment"
+  shell: "sudo kubectl apply -k /grafana_on_kubernetes"
+
+- name: "Launch Kube-state-metrics Deployment"
+  shell: "sudo kubectl apply -f /kube-state-metrics-configs/ -n kube-system"
+

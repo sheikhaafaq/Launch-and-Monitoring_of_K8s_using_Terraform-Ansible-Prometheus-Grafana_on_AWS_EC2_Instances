@@ -1,0 +1,21 @@
+
+- hosts: MasterNode
+  tasks:
+    - name: Running k8s Master Role
+      include_role:
+        name: Masternode
+
+- hosts: SlaveNodes
+  tasks:
+    - name: Running k8s Worker Role
+      include_role:
+        name: Workernode
+
+- hosts: MasterNode
+  tasks: 
+    - name: Running Monitoring Role
+      include_role:
+        name: Monitoring
+
+
+
